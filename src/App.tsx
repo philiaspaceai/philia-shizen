@@ -10,6 +10,7 @@ import Dashboard from './components/Dashboard';
 import FlashcardStudy from './components/FlashcardStudy';
 import CardBrowser from './components/CardBrowser';
 import SettingsTab from './components/SettingsTab';
+import InteractiveWalkthrough from './components/InteractiveWalkthrough';
 import { Language, t } from './utils/i18n';
 import {
   loadAllCards,
@@ -41,8 +42,11 @@ export default function App() {
     if (saved === 'en' || saved === 'ja' || saved === 'id') {
       return saved as Language;
     }
-    return 'en';
+    return 'id';
   });
+
+  // Walkthrough State
+  const [isWalkthroughOpen, setIsWalkthroughOpen] = useState(false);
 
   // Sync language with localStorage
   useEffect(() => {
@@ -62,11 +66,16 @@ export default function App() {
   const [studySessionItems, setStudySessionItems] = useState<HiraganaItem[]>([]);
   const [studySessionTitle, setStudySessionTitle] = useState('');
 
-  // Initial Load from localStorage
+  // Initial Load from localStorage & automatic walkthrough check
   useEffect(() => {
     setCardsState(loadAllCards());
     setLogs(loadReviewLogs());
     setStreak(getStreak());
+
+    const completed = localStorage.getItem('shizen_walkthrough_completed');
+    if (!completed) {
+      setIsWalkthroughOpen(true);
+    }
   }, []);
 
   // Update card FSRS stats after rating
@@ -210,6 +219,7 @@ export default function App() {
                 streak={streak}
                 language={language}
                 onLanguageChange={setLanguage}
+                onOpenWalkthrough={() => setIsWalkthroughOpen(true)}
               />
 
               {activeTab !== 'settings' && (
@@ -378,6 +388,13 @@ export default function App() {
           <span>Shizen しぜん • Spaced Repetition Memorization</span>
         </footer>
       </div>
+
+      {/* Interactive Walkthrough Overlay */}
+      <InteractiveWalkthrough
+        isOpen={isWalkthroughOpen}
+        onClose={() => setIsWalkthroughOpen(false)}
+        language={language}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { BookOpen, BarChart2, Settings } from 'lucide-react';
+import { BookOpen, BarChart2, Settings, HelpCircle } from 'lucide-react';
 import { Language, t } from '../utils/i18n';
 
 interface JapandiHeaderProps {
@@ -7,9 +7,10 @@ interface JapandiHeaderProps {
   streak: number;
   language: Language;
   onLanguageChange: (lang: Language) => void;
+  onOpenWalkthrough: () => void;
 }
 
-export default function JapandiHeader({ activeTab, onTabChange, streak, language, onLanguageChange }: JapandiHeaderProps) {
+export default function JapandiHeader({ activeTab, onTabChange, streak, language, onLanguageChange, onOpenWalkthrough }: JapandiHeaderProps) {
   return (
     <header className="border-b border-[#D5C9B9]/40 bg-[#FBF9F6]/80 backdrop-blur-md sticky top-0 z-30 px-4 py-3.5 flex flex-col space-y-3" id="app-header">
       {/* Branding and Sun Crest */}
@@ -31,6 +32,16 @@ export default function JapandiHeader({ activeTab, onTabChange, streak, language
             <span className="w-1.5 h-1.5 rounded-full bg-[#6B7F6D] animate-ping" />
             <span>{t('active_learning', language)}</span>
           </div>
+
+          {/* Help button for launching the guide */}
+          <button
+            onClick={onOpenWalkthrough}
+            className="p-1.5 rounded-lg border border-[#D5C9B9]/50 bg-[#FAF6F1]/80 hover:bg-[#EAE3D5]/40 text-[#8A7E72] hover:text-[#4A433D] transition-colors"
+            title="Guide / Walkthrough"
+            id="btn-header-help"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+          </button>
 
           {/* Elegant Language Selector */}
           <select
