@@ -1,0 +1,8 @@
+{
+  "name": "philia-shizen",
+  "description": "A Japandi-styled Mobile-First PWA for Hiragana memorization using the FSRS Spaced Repetition algorithm.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

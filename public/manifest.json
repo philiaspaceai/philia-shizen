@@ -1,0 +1,30 @@
+{
+  "short_name": "Shizen",
+  "name": "Shizen Kana Memorization",
+  "description": "A Japandi-styled PWA for Hiragana and Katakana memorization using the FSRS Spaced Repetition algorithm.",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "any"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#FBF9F6",
+  "theme_color": "#FBF9F6",
+  "display": "standalone",
+  "orientation": "portrait"
+}
