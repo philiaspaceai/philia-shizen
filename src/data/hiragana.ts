@@ -603,7 +603,7 @@ export const rawItems: [number, string, string, number][] = [
   [592, "が", "ga", 0],
   [593, "がい", "gai", 0],
   [594, "あがり", "agari", 0],
-  [595, "え笑顔", "egao", 0],
+  [595, "えがお", "egao", 0],
   [596, "がっか", "gakka", 0],
   [597, "かいが", "kaiga", 0],
   [598, "さがし", "sagashi", 0],
