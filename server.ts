@@ -24,6 +24,44 @@ if (!fs.existsSync(AUDIO_CACHE_DIR)) {
 const pendingAudioPromises = new Map<string, Promise<string>>();
 
 /**
+ * Helper to stream an audio file with full HTTP 206 Partial Content (Range) support.
+ * This is critical for iOS Safari, WebKit, and mobile browsers.
+ */
+function sendAudioFileWithRange(req: express.Request, res: express.Response, filePath: string) {
+  const stat = fs.statSync(filePath);
+  const fileSize = stat.size;
+  const range = req.headers.range;
+
+  res.setHeader('Content-Type', 'audio/mpeg');
+  res.setHeader('Accept-Ranges', 'bytes');
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+
+  if (range) {
+    // Parse Range header (e.g., "bytes=0-1" or "bytes=1000-")
+    const parts = range.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+    if (start >= fileSize || end >= fileSize || start > end) {
+      res.setHeader('Content-Range', `bytes */${fileSize}`);
+      return res.status(416).end();
+    }
+
+    const chunksize = end - start + 1;
+    const file = fs.createReadStream(filePath, { start, end });
+
+    res.status(206);
+    res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+    res.setHeader('Content-Length', chunksize);
+    file.pipe(res);
+  } else {
+    res.status(200);
+    res.setHeader('Content-Length', fileSize);
+    fs.createReadStream(filePath).pipe(res);
+  }
+}
+
+/**
  * High-quality Microsoft Edge Neural Japanese voice endpoint
  * Parameters:
  *   text: text to pronounce
@@ -48,12 +86,9 @@ app.get('/api/tts', async (req, res) => {
   const hash = crypto.createHash('md5').update(`${text}_${voice}_${rate}`).digest('hex');
   const cacheFile = path.join(AUDIO_CACHE_DIR, `${hash}.mp3`);
 
-  // If already synthesized and cached on disk, stream immediately
+  // If already synthesized and cached on disk, stream with Range support immediately
   if (fs.existsSync(cacheFile) && fs.statSync(cacheFile).size > 0) {
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    const readStream = fs.createReadStream(cacheFile);
-    return readStream.pipe(res);
+    return sendAudioFileWithRange(req, res, cacheFile);
   }
 
   try {
@@ -80,10 +115,7 @@ app.get('/api/tts', async (req, res) => {
     pendingAudioPromises.delete(hash);
 
     if (fs.existsSync(generatedFile) && fs.statSync(generatedFile).size > 0) {
-      res.setHeader('Content-Type', 'audio/mpeg');
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      const readStream = fs.createReadStream(generatedFile);
-      readStream.pipe(res);
+      sendAudioFileWithRange(req, res, generatedFile);
     } else {
       throw new Error('TTS generated an empty file');
     }

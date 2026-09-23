@@ -1,4 +1,4 @@
-const CACHE_NAME = 'shizen-v1';
+const CACHE_NAME = 'shizen-v2';
 const ASSETS = [
   '/',
   '/index.html',
@@ -34,8 +34,16 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only handle same-origin or HTTP/HTTPS requests
-  if (!event.request.url.startsWith(self.location.origin)) {
+  const url = new URL(event.request.url);
+
+  // 1. NEVER intercept /api/ routes (especially /api/tts streaming audio)
+  // Let the browser handle audio requests natively with HTTP Range headers
+  if (url.pathname.startsWith('/api/')) {
+    return;
+  }
+
+  // 2. Only handle same-origin GET requests
+  if (!event.request.url.startsWith(self.location.origin) || event.request.method !== 'GET') {
     return;
   }
   

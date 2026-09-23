@@ -1,13 +1,53 @@
 // Audio pronunciation service powered by Microsoft Edge Neural TTS
-// Clean HTML5 Audio playback without browser SpeechSynthesis
+// Clean HTML5 Audio playback engineered for Desktop and Mobile (iOS Safari & Android Chrome)
 
 let activeAudio: HTMLAudioElement | null = null;
+let isAudioUnlocked = false;
 
 /**
- * Preload and cache in-memory audio instances for immediate playback
+ * Mobile browsers (iOS Safari, Android Chrome) require a user gesture
+ * to unlock audio playback. This plays a silent buffer on first user touch/click.
  */
-const audioCache = new Map<string, HTMLAudioElement>();
+export function unlockMobileAudio(): void {
+  if (isAudioUnlocked || typeof window === 'undefined') return;
 
+  try {
+    // 1-sample silent WAV base64
+    const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+    silentAudio.volume = 0.01;
+    const playPromise = silentAudio.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          isAudioUnlocked = true;
+          silentAudio.pause();
+        })
+        .catch(() => {
+          // Will retry on next interaction
+        });
+    }
+  } catch {
+    // Ignore unlock errors
+  }
+}
+
+// Automatically bind to first touch/click event to unlock mobile audio
+if (typeof window !== 'undefined') {
+  const unlockEvents = ['touchstart', 'touchend', 'click', 'keydown'];
+  const handleInteraction = () => {
+    unlockMobileAudio();
+    unlockEvents.forEach((evt) => {
+      window.removeEventListener(evt, handleInteraction);
+    });
+  };
+  unlockEvents.forEach((evt) => {
+    window.addEventListener(evt, handleInteraction, { once: true, passive: true });
+  });
+}
+
+/**
+ * Construct URL to our backend Edge TTS service
+ */
 export function getAudioUrl(text: string, voice = 'ja-JP-NanamiNeural', rate = '-10%'): string {
   const params = new URLSearchParams({
     text: text.trim(),
@@ -19,7 +59,7 @@ export function getAudioUrl(text: string, voice = 'ja-JP-NanamiNeural', rate = '
 
 /**
  * Play audio using Microsoft Edge Neural TTS
- * Automatically stops any previously playing pronunciation and plays the new one.
+ * Automatically stops any previously playing pronunciation and plays the new one cleanly.
  */
 export function playHiraganaAudio(
   text: string,
@@ -29,26 +69,25 @@ export function playHiraganaAudio(
   const cleanText = text.trim();
   if (!cleanText) return Promise.resolve();
 
+  unlockMobileAudio();
+
   // Stop any ongoing audio immediately to avoid overlapping
   if (activeAudio) {
     activeAudio.pause();
     activeAudio.currentTime = 0;
-    activeAudio = null;
   }
 
   const url = getAudioUrl(cleanText, voice, rate);
 
-  let audio = audioCache.get(url);
-  if (!audio) {
-    audio = new Audio(url);
-    // Cache for reuse during repeated reviews
-    audioCache.set(url, audio);
+  // Reuse singleton Audio instance on mobile or instantiate new Audio
+  if (!activeAudio) {
+    activeAudio = new Audio();
   }
 
-  activeAudio = audio;
-  audio.currentTime = 0;
+  activeAudio.src = url;
+  activeAudio.currentTime = 0;
 
-  return audio.play().catch((err) => {
+  return activeAudio.play().catch((err) => {
     console.warn('Audio playback error:', err);
   });
 }
@@ -62,13 +101,12 @@ export function preloadKanaAudio(
   rate = '-10%'
 ): void {
   const cleanText = text.trim();
-  if (!cleanText) return;
+  if (!cleanText || typeof window === 'undefined') return;
 
   const url = getAudioUrl(cleanText, voice, rate);
-  if (!audioCache.has(url)) {
-    const audio = new Audio();
-    audio.preload = 'auto';
-    audio.src = url;
-    audioCache.set(url, audio);
+  
+  // Use HTML link preload or fetch to populate browser HTTP cache without blocking audio hardware
+  if ('fetch' in window) {
+    fetch(url, { method: 'GET', mode: 'cors' }).catch(() => {});
   }
 }
