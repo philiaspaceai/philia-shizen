@@ -1,8 +1,11 @@
-// Audio pronunciation service powered by Microsoft Edge Neural TTS
-// Clean HTML5 Audio playback engineered for Desktop and Mobile (iOS Safari & Android Chrome)
+// Audio pronunciation service powered by Microsoft Edge Neural TTS with resilient client-side fallback
+// Seamless on Vercel Serverless, Web, and Mobile (Android Chrome & iOS Safari)
 
 let activeAudio: HTMLAudioElement | null = null;
 let isAudioUnlocked = false;
+
+// Global reference to keep speech synthesis utterance from being garbage-collected on mobile browsers
+let activeUtterance: SpeechSynthesisUtterance | null = null;
 
 /**
  * Mobile browsers (iOS Safari, Android Chrome) require a user gesture
@@ -46,7 +49,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * Construct URL to our backend Edge TTS service
+ * Construct URL to our Edge TTS API endpoint (works both in local dev and Vercel serverless /api/tts)
  */
 export function getAudioUrl(text: string, voice = 'ja-JP-NanamiNeural', rate = '-10%'): string {
   const params = new URLSearchParams({
@@ -58,16 +61,58 @@ export function getAudioUrl(text: string, voice = 'ja-JP-NanamiNeural', rate = '
 }
 
 /**
+ * Native SpeechSynthesis fallback for mobile devices if network is offline or Vercel serverless is cold-starting
+ */
+export function playNativeSpeechFallback(text: string): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      resolve();
+      return;
+    }
+
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'ja-JP';
+      utterance.rate = 0.85;
+
+      const voices = window.speechSynthesis.getVoices();
+      const jaVoice = voices.find(
+        (v) => v.lang.startsWith('ja') || v.lang.replace('_', '-').startsWith('ja')
+      );
+      if (jaVoice) {
+        utterance.voice = jaVoice;
+      }
+
+      utterance.onend = () => {
+        activeUtterance = null;
+        resolve();
+      };
+      utterance.onerror = () => {
+        activeUtterance = null;
+        resolve();
+      };
+
+      activeUtterance = utterance;
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      resolve();
+    }
+  });
+}
+
+/**
  * Play audio using Microsoft Edge Neural TTS
  * Automatically stops any previously playing pronunciation and plays the new one cleanly.
+ * If network fails or returns non-audio, seamlessly falls back to native device TTS.
  */
-export function playHiraganaAudio(
+export async function playHiraganaAudio(
   text: string,
   voice = 'ja-JP-NanamiNeural',
   rate = '-10%'
 ): Promise<void> {
   const cleanText = text.trim();
-  if (!cleanText) return Promise.resolve();
+  if (!cleanText) return;
 
   unlockMobileAudio();
 
@@ -79,17 +124,20 @@ export function playHiraganaAudio(
 
   const url = getAudioUrl(cleanText, voice, rate);
 
-  // Reuse singleton Audio instance on mobile or instantiate new Audio
-  if (!activeAudio) {
-    activeAudio = new Audio();
+  // Play audio via HTML5 Audio element
+  try {
+    if (!activeAudio) {
+      activeAudio = new Audio();
+    }
+
+    activeAudio.src = url;
+    activeAudio.currentTime = 0;
+
+    await activeAudio.play();
+  } catch (err) {
+    console.warn('Edge TTS playback failed or blocked on mobile, using native voice fallback:', err);
+    await playNativeSpeechFallback(cleanText);
   }
-
-  activeAudio.src = url;
-  activeAudio.currentTime = 0;
-
-  return activeAudio.play().catch((err) => {
-    console.warn('Audio playback error:', err);
-  });
 }
 
 /**
@@ -105,7 +153,6 @@ export function preloadKanaAudio(
 
   const url = getAudioUrl(cleanText, voice, rate);
   
-  // Use HTML link preload or fetch to populate browser HTTP cache without blocking audio hardware
   if ('fetch' in window) {
     fetch(url, { method: 'GET', mode: 'cors' }).catch(() => {});
   }
