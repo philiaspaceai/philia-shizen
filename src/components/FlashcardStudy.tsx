@@ -3,7 +3,7 @@ import { Card, Rating } from 'ts-fsrs';
 import { motion, AnimatePresence } from 'motion/react';
 import { Volume2, CheckCircle, ChevronLeft, HelpCircle } from 'lucide-react';
 import { HiraganaItem } from '../data/hiragana';
-import { playHiraganaAudio } from '../utils/audio';
+import { playHiraganaAudio, preloadKanaAudio } from '../utils/audio';
 import { getFsrsInstance } from '../utils/fsrsService';
 import { Language, t } from '../utils/i18n';
 
@@ -80,10 +80,17 @@ export default function FlashcardStudy({
     }
   }, [currentCard, scheduler]);
 
-  // Reset flip state on item index changes
+  // Reset flip state on item index changes and preload audio for instant playback
   useEffect(() => {
     setIsFlipped(false);
-  }, [currentIndex]);
+    if (currentItem) {
+      preloadKanaAudio(currentItem.hiragana);
+    }
+    const nextItem = items[currentIndex + 1];
+    if (nextItem) {
+      preloadKanaAudio(nextItem.hiragana);
+    }
+  }, [currentIndex, currentItem, items]);
 
   if (items.length === 0) {
     return (
